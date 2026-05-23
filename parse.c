@@ -871,7 +871,9 @@ static bool is_function(Token *token) {
 static bool is_type(Token *token) {
   char *kw[] = {
     "_Bool", "void", "char", "short", "int", "long", "struct", "union", "enum",
-    "typedef", "static", "extern", "_Alignas", "signed", "unsigned"
+    "typedef", "static", "extern", "_Alignas", "signed", "unsigned",
+    "const", "volatile", "auto", "register", "restrict",
+    "__restrict", "__restrict__", "__Noreturn"
   };
   for (int i = 0; i < sizeof(kw) / sizeof(*kw); i++) {
     if (equal(token, kw[i])) {
@@ -1412,6 +1414,7 @@ static Type *enum_specifier(Token **rest, Token *token) {
 /*
   declspec ::= ("_Bool" | "void" | "char" | "short" | "int" | "long"
              | "struct-decl" | "union-decl" | "enum-specifier" | "_Alignas" | "signed" | "unsigned"
+             | "const" | "volatile" | "auto" | "register" | "restrict" | "__restrict" | "__restrict__" | "__Noreturn"
              | "typedef" | "static" | "extern" | typedef-name)+
 */
 static Type *declspec(Token **rest, Token *token, VarAttr *attr) {
@@ -1448,6 +1451,15 @@ static Type *declspec(Token **rest, Token *token, VarAttr *attr) {
         error_at(token->loc, "%s", "typedef may not be used together with static or extern");
       }
 
+      token = token->next;
+      continue;
+    }
+
+    // ignore type qualifier
+    if (equal(token, "const") || equal(token, "volatile") 
+        || equal(token, "auto") || equal(token, "restrict") 
+        || equal(token, "__restrict") || equal(token, "__restrict__") 
+        || equal(token, "__Noreturn")) {
       token = token->next;
       continue;
     }
@@ -1644,12 +1656,28 @@ static Node *declaration(Token **rest, Token *token, Type *basety, VarAttr *attr
 }
 
 /*
-  declarator ::= "*"* ( "(" declarator ")" | ident ) type-suffix
+  pointer ::= ("*" (const | volatile | auto | restrict | __restrict | __restrict__ | __Noreturn)*)*
 */
-static Type *declarator(Token **rest, Token *token, Type *ty) {
+static Type *pointers(Token **rest, Token *token, Type *ty) {
     while (consume(&token, token, "*")) {
       ty = pointer_to(ty);
+      while (equal(token, "const") || equal(token, "volatile") 
+          || equal(token, "auto") || equal(token, "restrict")
+          || equal(token, "__restrict") || equal(token, "__restrict__")
+          || equal(token, "__Noreturn")) {
+        token = token->next;
+      }
     }
+
+    *rest = token;
+    return ty;
+}
+
+/*
+  declarator ::= pointers ( "(" declarator ")" | ident ) type-suffix
+*/
+static Type *declarator(Token **rest, Token *token, Type *ty) {
+    ty = pointers(&token, token, ty);
 
     if (equal(token, "(")) {
       Token *start = token;
@@ -2702,12 +2730,10 @@ static Node *cast(Token **rest, Token *token) {
 }
 
 /*
-  abstract-declarator ::= "*"* ("(" abstract-declarator ")")? type-suffix
+  abstract-declarator ::= pointers ("(" abstract-declarator ")")? type-suffix
 */
 static Type *abstract_declarator(Token **rest, Token *token, Type *ty) {
-  while (consume(&token, token, "*")) {
-    ty = pointer_to(ty);
-  }
+  ty = pointers(&token, token, ty);
   
   if (equal(token, "(")) {
     Token *start = token;

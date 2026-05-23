@@ -80,6 +80,8 @@ static int keyword_len(char *p) {
   char *key[] = {"return", "if", "else", "for", "while", "do",
                 "_Bool", "void", "char", "short", "int", "long",
                 "struct", "union", "enum", "_Alignas","signed","unsigned",
+                "const", "volatile", "auto", "register", "restrict",
+                "__restrict", "__restrict__", "__Noreturn",
                 "sizeof", "_Alignof",
                 "typedef", "static", "extern",
                 "goto", "break", "continue", "switch", "case", "default"
@@ -477,7 +479,11 @@ Token *tokenize(char *p, char *file) {
       continue;
     }
 
-    //PUNCTUATORS
+    /* Punctuator:
+    * Read C punctuator tokens.
+    * Examples: + - * / == != <= >= -> ; , ( ) { } [ ]
+    * Derived from "punctuation".
+    */
     int pl = read_punct(p);
     if (pl) {
       cur = cur->next = new_token(TK_PUNCT, p, p + pl);

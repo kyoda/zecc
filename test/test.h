@@ -7,3 +7,4 @@ extern int sprintf(char *buf, char *fmt, ...);
 // #include <string.h> > none unsigned type specifier and etc..
 extern int memcmp(char *p, char *q, int n);
 extern int strcmp(char *p, char *q);
+void exit(int n);
