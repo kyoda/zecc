@@ -33,6 +33,8 @@ void ret_none(void) {
   return;
 }
 
+void empty_block() {}
+
 # include <stdarg.h>
 int add_all(int n, ...) {
     va_list ap;

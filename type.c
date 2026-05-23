@@ -92,6 +92,7 @@ static Type *get_common_type(Type *ty1, Type *ty2) {
   return ty1;
 }
 
+//usual arithmetic conversions
 static void usual_arith_conv(Node **lhs, Node **rhs) {
   Type *ty = get_common_type((*lhs)->ty, (*rhs)->ty);
 

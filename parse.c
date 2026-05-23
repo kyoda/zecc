@@ -1712,8 +1712,33 @@ static Type *declarator(Token **rest, Token *token, Type *ty) {
 }
 
 /*
+  array_dimensions ::= ("static" || "restrict" || "__restrict" || "__restrict__")* const-expr? "]" type-suffix
+*/
+static Type *array_dimensions(Token **rest, Token *token, Type *ty) {
+  //incomplete array
+  if (equal(token, "]")) {
+    ty = type_suffix(rest, token->next, ty);
+    return ty_array(ty, -1);
+  }
+
+  // Now, skip array qualifier
+  while (equal(token, "static") || equal(token, "const") 
+   || equal(token, "volatile") || equal(token, "restrict")
+   || equal(token, "__restrict") || equal(token, "__restrict__")) {
+    token = token->next;
+  }
+
+  int64_t size = const_expr(&token, token);
+  expect(&token, token, "]");
+  ty = type_suffix(&token, token, ty);
+  *rest = token;
+
+  return ty_array(ty, size);
+}
+
+/*
   type-suffix ::= "(" func-params ")"
-                | "[" num? "]" type-suffix
+                | array-dimensions
                 | ε
 */
 static Type *type_suffix(Token **rest, Token *token, Type *ty) {
@@ -1722,19 +1747,7 @@ static Type *type_suffix(Token **rest, Token *token, Type *ty) {
   }
 
   if (equal(token, "[")) {
-    token = token->next;
-
-    //incomplete array
-    if (equal(token, "]")) {
-      ty = type_suffix(rest, token->next, ty);
-      return ty_array(ty, -1);
-    }
-
-    int64_t size = const_expr(&token, token);
-    expect(&token, token, "]");
-    ty = type_suffix(&token, token, ty);
-    *rest = token;
-    return ty_array(ty, size);
+    return array_dimensions(rest, token->next, ty);
   }
 
   *rest = token;
@@ -1847,9 +1860,10 @@ static Node *compound_stmt(Token **rest, Token *token) {
     } else {
       cur = cur->next = stmt(&token, token);
     }
+
+    add_type(cur);
   }
   
-  add_type(cur);
 
   expect(&token, token, "}");
 
