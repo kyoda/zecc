@@ -95,6 +95,28 @@ int main() {
   ASSERT(55, add_all(10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10));
   ASSERT(28, ({char a6 = 6; short a7 = 7; add_all(7, 1, 2, 3, 4, 5, a6, a7);}));
 
+  int no_name(int a);
+  int no_name(int a);
+  int no_name(int);
+  ASSERT(1, no_name(1));
+
   printf("OK\n");
   return 0;
 }
+
+int no_name(int a) {
+  return a;
+}
+
+/* error
+//int no_name(int a) {
+//    ^ no_name: redefinition of function
+
+int no_name(int a) {
+  return a;
+}
+
+int no_name2(int) {
+  return 0;
+}
+*/

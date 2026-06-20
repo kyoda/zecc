@@ -301,11 +301,6 @@ static Obj *new_lvar(char *name, Type *ty) {
 }
 
 static Obj *new_gvar(char *name, Type *ty) {
-  Obj *var = find_var_by_name(name);
-  if (var) {
-    error_at("%s: defined variable", name);
-  }
-
   Obj *gvar = new_var(name, ty);
   gvar->next = globals;
   gvar->is_static = true;
@@ -887,6 +882,9 @@ static bool is_type(Token *token) {
 static void create_params(Type *param) {
   if (param) {
     create_params(param->next);
+    if (!param->token) {
+      error_at(param->name_pos->loc, "parameter name ommitted");
+    }
     new_lvar(get_ident_name(param->token), param);
   }
 }
@@ -914,14 +912,56 @@ static void resolve_goto_labels() {
 */
 static void *function (Token **rest, Token *token, Type *basety, VarAttr *attr) {
   Type *ty = declarator(&token, token, basety);
-  Obj *fn = new_gvar(get_ident_name(ty->token), ty);
-  fn->is_function = true;
-  fn->is_definition = !consume(&token, token, ";");
-  fn->is_static = attr->is_static;
+  if (!ty->token) {
+    error_at(ty->name_pos->loc, "function name omitted");
+  }
 
-  if (!fn->is_definition) {
-    *rest = token;
-    return NULL;
+  bool is_definition = !consume(&token, token, ";");
+  Obj *fn = find_var_by_name(get_ident_name(ty->token));
+
+  /*
+   * Function symbol state transition:
+   *
+   *   int foo(int);          // declaration
+   *   int foo(int);          // redeclaration
+   *   int foo(int x) { ... } // definition
+   *
+   * The first declaration creates the symbol.
+   * Subsequent declarations reuse the existing symbol after type checking.
+   * A definition upgrades the existing symbol (is_definition=true).
+   * Multiple definitions are an error.
+   */
+  if (fn) {
+    if (!fn->is_function) {
+      error_at(ty->token->loc, "%s: redefinition of variable", get_ident_name(ty->token));
+    }
+
+    if (fn->is_definition) {
+      if (is_definition) {
+        error_at(ty->token->loc, "%s: redefinition of function", get_ident_name(ty->token));
+      } else {
+        *rest = token;
+        return NULL;
+      }
+    } else {
+      if (!is_definition) {
+        *rest = token;
+        return NULL;
+      } else {
+        fn->is_definition = true;
+      }
+    }
+  } else {
+    fn = new_gvar(get_ident_name(ty->token), ty);
+    fn->is_function = true;
+    fn->is_static = attr->is_static;
+
+    // function declaration
+    if (!is_definition) {
+      fn->is_definition = false;
+      *rest = token;
+      return NULL;
+    }
   }
 
   current_fn = fn;
@@ -1066,6 +1106,9 @@ static void *global_variable (Token **rest, Token *token, Type *basety, VarAttr 
       i++;
 
       Type *ty = declarator(&token, token, basety);
+      if (!ty->token) {
+        error_at(ty->name_pos->loc, "%s", "variable name omitted");
+      }
 
       Obj *gvar = new_gvar(get_ident_name(ty->token), ty);
       /*
@@ -1112,6 +1155,9 @@ static void parse_typedef(Token **rest, Token *token, Type *basety) {
     }
 
     Type *ty = declarator(&token, token, basety);
+    if (!ty->token) {
+      error_at(ty->name_pos->loc, "%s", "typedef name omitted");
+    }
     push_scope(get_ident_name(ty->token))->type_def = ty;
 
     c++;
@@ -1610,6 +1656,10 @@ static Node *declaration(Token **rest, Token *token, Type *basety, VarAttr *attr
         error_at(token->loc, "%s", "void type variable");
       }
 
+      //if (!ty->token) {
+      //  error_at(ty->name_pos->loc, "%s", "function name is omitted");
+      //}
+
       if (attr && attr->is_static) {
         // static local variable
         Obj *gvar = new_gvar(get_ident_name(ty->token), ty);
@@ -1699,14 +1749,32 @@ static Type *declarator(Token **rest, Token *token, Type *ty) {
       return declarator(&token, start->next, ty);
     }
 
-    if (token->kind != TK_IDENT) {
-      error_at(token->loc, "%s", "expect TK_IDENT");
+    //if (token->kind != TK_IDENT) {
+    //  error_at(token->loc, "%s", "expect TK_IDENT");
+    //}
+
+    /*
+      identは、type_suffixの後に取得する
+      type_suffix内で、functionかarrayかを判断しtypeを作成
+
+      下記のように引数名の省略もあるためそのtokenのあるなしとエラー出力のためのpositionを保存しておく
+
+       - int func(int a) のような引数名の取得
+       - int func(int); のような宣言での引数名省略
+
+
+    */
+    Token *name = NULL;
+    Token *name_pos = token;
+    if (token->kind == TK_IDENT) {
+      name = token;
+      token = token->next;
     }
 
-    ty = type_suffix(rest, token->next, ty);
-
+    ty = type_suffix(rest, token, ty);
     //ident取得用
-    ty->token = token;
+    ty->token = name;
+    ty->name_pos = name_pos;
 
     return ty;
 }

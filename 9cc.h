@@ -157,7 +157,9 @@ struct Type {
   bool is_variadic; // variadic function
   Type *next; //params
 
-  Token *token; // declaration
+  // declaration
+  Token *token;
+  Token *name_pos;
 
   // struct
   Member *members;
