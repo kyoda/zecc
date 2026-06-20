@@ -86,6 +86,26 @@ int main() {
   ASSERT(-1, 0x1 << 31 >> 31);
   ASSERT(-1, 0b1 << 31 >> 31);
 
+  0.0;
+  .0;
+  0.;
+  .5f;
+  1.5;
+  1.5e-2F;
+  1.5E+2;
+  0x10.5p-2;
+  5.l;
+  5.0L;
+
+  ASSERT(8, sizeof(0.0));
+  ASSERT(4, sizeof(.0f));
+  ASSERT(8, sizeof(.0e3));
+  ASSERT(4, sizeof(.0e3f));
+  ASSERT(8, sizeof(5.0L));
+  ASSERT(0.0, 0.0f + 0.1);
+  ASSERT(1, ({ 0.0 + 0.1 == 0.1; }));
+
+
   printf("OK\n");
   return 0;
 }

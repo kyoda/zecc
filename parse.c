@@ -3302,9 +3302,15 @@ static Node *primary(Token **rest, Token *token) {
   }
 
   if (token->kind == TK_NUM) {
-    Node *n = new_node_num(token->val, token);
-    n->ty = token->ty;
+    Node *n;
+    if (is_flonum(token->ty)) {
+      n = new_node(ND_NUM, token);
+      n->fval = token->fval;
+    } else {
+      n = new_node_num(token->val, token);
+    }
 
+    n->ty = token->ty;
     *rest = token->next;
     return n;
   }

@@ -10,6 +10,8 @@ Type *ty_int = &(Type){.kind = TY_INT, .size = 4, .align = 4, .is_unsigned = fal
 Type *ty_uint = &(Type){.kind = TY_INT, .size = 4, .align = 4, .is_unsigned = true};
 Type *ty_long = &(Type){.kind = TY_LONG, .size = 8, .align = 8, .is_unsigned = false};
 Type *ty_ulong = &(Type){.kind = TY_LONG, .size = 8, .align = 8, .is_unsigned = true};
+Type *ty_float = &(Type){.kind = TY_FLOAT, .size = 4, .align = 4};
+Type *ty_double = &(Type){.kind = TY_DOUBLE, .size = 8, .align = 8};
 Type *ty_enum = &(Type){.kind = TY_ENUM, .size = 4, .align = 4};
 Type *ty_struct = &(Type){.kind = TY_STRUCT, .size = 0, .align = 1};
 Type *ty_va_list = &(Type){.kind = TY_STRUCT, .size = 24, .align = 8};
@@ -118,13 +120,16 @@ char *get_type_name(Type *ty) {
 }
 
 bool is_integer(Type *ty) {
-  TypeKind kind = ty->kind;
-  return kind == TY_BOOL || 
-         kind == TY_CHAR ||
-         kind == TY_SHORT ||
-         kind == TY_INT ||
-         kind == TY_ENUM ||
-         kind == TY_LONG;
+  return ty->kind == TY_BOOL || 
+         ty->kind == TY_CHAR ||
+         ty->kind == TY_SHORT ||
+         ty->kind == TY_INT ||
+         ty->kind == TY_ENUM ||
+         ty->kind == TY_LONG;
+}
+
+bool is_flonum(Type *ty) {
+  return ty->kind == TY_FLOAT || ty->kind == TY_DOUBLE;
 }
 
 void add_type(Node *n) {

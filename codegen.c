@@ -230,6 +230,53 @@ static void gen_expr(Node *n) {
 
   switch (n->kind) {
   case ND_NUM:
+
+    /* 
+      IEEE754: Floating-point format
+        exponent uses a bias (127 for float, 1023 for double).
+        fraction stores bits after the implicit leading 1.
+        value = (-1)^sign * 1.fraction * 2^(exp-bias)
+
+      float(32bit)
+        1bit: sign
+        8bit: exponent
+        23bit: fraction
+
+      31      30         23 22                0
+      +---------+-----------+------------------+
+      | Sign(1) | Exp(8)    | Fraction(23)     |
+      +---------+-----------+------------------+
+
+      double(64bit)
+      63      62          52 51                 0
+      +---------+------------+-------------------+
+      | Sign(1) | Exp(11)    | Fraction(52)      |
+      +---------+------------+-------------------+
+
+    */
+    // Reinterpret floating-point values as integer bit patterns.
+    union {
+      float f32;
+      double f64;
+      uint32_t u32;
+      uint64_t u64;
+    } u;
+
+    // Move float/double literal to xmm0 via its IEEE754 bit pattern.
+    switch (n->ty->kind) {
+    case TY_FLOAT:
+      u.f32 = n->fval;
+      println("  mov eax, %u", u.u32);
+      println("  movq xmm0, rax");
+      break;
+    case TY_DOUBLE:
+      u.f64 = n->fval;
+      println("  mov rax, %lu", u.u64);
+      println("  movq xmm0, rax");
+      break;
+    }
+
+
     println("  mov rax, %ld", n->val);
 
     return;

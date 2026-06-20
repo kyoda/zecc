@@ -31,7 +31,8 @@ typedef enum {
 struct Token {
   TokenKind kind;
   Token *next;
-  uint64_t val;
+  int64_t val;
+  double fval;
   char *loc;
   int len; // not array_len but length of token
   int line; // for .loc directive
@@ -118,7 +119,8 @@ struct Node {
   Type *func_ty;
   Node *args;
 
-  uint64_t val;
+  int64_t val;
+  double fval;
   Obj *var; // ND_VAR
 
   Token *token; // for error message
@@ -134,6 +136,8 @@ typedef enum {
   TY_SHORT,
   TY_INT,
   TY_LONG,
+  TY_FLOAT,
+  TY_DOUBLE,
   TY_ENUM,
   TY_PTR,
   TY_ARRAY,
@@ -259,6 +263,8 @@ typedef struct {
 Type *new_type(TypeKind kind, int size, int align);
 extern Type *ty_void;
 extern Type *ty_bool;
+extern Type *ty_float;
+extern Type *ty_double;
 extern Type *ty_enum;
 extern Type *ty_char;
 extern Type *ty_uchar;
@@ -276,6 +282,7 @@ Type *ty_func(Type *base);
 Type *cp_type(Type *ty);
 char *get_type_name(Type *ty);
 bool is_integer(Type *ty);
+bool is_flonum(Type *ty);
 void add_type(Node *n);
 
 // tokenize.c

@@ -78,7 +78,7 @@ Token *skip(Token *t, char *op) {
 
 static int keyword_len(char *p) {
   char *key[] = {"return", "if", "else", "for", "while", "do",
-                "_Bool", "void", "char", "short", "int", "long",
+                "_Bool", "void", "char", "short", "int", "long", "float", "double",
                 "struct", "union", "enum", "_Alignas","signed","unsigned",
                 "const", "volatile", "auto", "register", "restrict",
                 "__restrict", "__restrict__", "__Noreturn",
@@ -266,10 +266,6 @@ static Token *read_int_literal(char *p) {
     p += 1;
   }
 
-  if (isalnum(*p)) {
-    error_at(p, "invalid digit");
-  }
-
   /*
   * Infer the type of an integer literal based on its value and suffixes.
   *
@@ -342,6 +338,42 @@ static Token *read_int_literal(char *p) {
   t->val = val;
   t->ty = ty;
   return t;
+}
+
+static Token *read_number(char *start) {
+  // Read a decimal or hexadecimal -point literal and return a token.
+  Token *token = read_int_literal(start);
+
+  /*
+    1e3 -> 1000
+    1.5e-2 -> 0.015
+    1.5e+2 -> 150
+    1.5f -> 1.5
+    1.5e-2f -> 0.015
+  */
+  if (strchr(".eEfF", start[token->len]) == NULL) {
+    return token;
+  }
+
+  // if it's is not integer literal, it must be a floating-point literal
+  char *end;
+  double fval = strtod(start, &end);
+  Type *ty;
+  if (*end == 'f' || *end == 'F') {
+    ty = cp_type(ty_float);
+    end++;
+  } else if(*end == 'l' || *end == 'L') {
+    ty = cp_type(ty_double);
+    end++;
+  } else {
+    ty = cp_type(ty_double);
+  }
+
+  token = new_token(TK_NUM, start, end);
+  token->fval = fval;
+  token->ty = ty;
+
+  return token;
 }
 
 /*
@@ -439,8 +471,11 @@ Token *tokenize(char *p, char *file) {
       continue;
     }
 
-    if (isdigit(*p)) {
-      cur = cur->next = read_int_literal(p);
+    /*
+      e.g. 3, 1.e3, .5, 1.5e-2, 1.5e+2, 1.5f, 1.5e-2f
+    */
+    if (isdigit(*p) || (*p == '.' && isdigit(p[1]))) {
+      cur = cur->next = read_number(p);
       p += cur->len;
       continue;
     }
