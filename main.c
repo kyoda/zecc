@@ -4,7 +4,7 @@ static char *infile;
 static char *out_opt;
 
 static void usage(int exit_code) {
-  fprintf(stderr, "Usage: 9cc [-h|--help] [-o outfile] infile\n");
+  fprintf(stderr, "Usage: zecc [-h|--help] [-o outfile] infile\n");
   exit(exit_code);
 }
 

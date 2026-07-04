@@ -9,21 +9,21 @@ check () {
     fi
 }
 
-tmp=$(mktemp -d /tmp/9cc-test-XXXXXXXXXX)
+tmp=$(mktemp -d /tmp/zecc-test-XXXXXXXXXX)
 trap 'rm -rf $tmp' INT TERM HUP EXIT
 echo > $tmp/empty.c
 
 
 # -o
 rm -f $tmp/tmp.s
-./9cc -o $tmp/tmp.s $tmp/empty.c
+./zecc -o $tmp/tmp.s $tmp/empty.c
 [ -f $tmp/tmp.s ]
 check "-o"
 
 # -h
-./9cc -h 2>&1 | grep -q '9cc'
+./zecc -h 2>&1 | grep -q 'zecc'
 check "-h"
 
 # --help
-./9cc --help 2>&1 | grep -q '9cc'
+./zecc --help 2>&1 | grep -q 'zecc'
 check "--help"
