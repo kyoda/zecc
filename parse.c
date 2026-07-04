@@ -865,7 +865,8 @@ static bool is_function(Token *token) {
 
 static bool is_type(Token *token) {
   char *kw[] = {
-    "_Bool", "void", "char", "short", "int", "long", "struct", "union", "enum",
+    "_Bool", "void", "char", "short", "int", "long", "float", "double",
+    "struct", "union", "enum",
     "typedef", "static", "extern", "_Alignas", "signed", "unsigned",
     "const", "volatile", "auto", "register", "restrict",
     "__restrict", "__restrict__", "__Noreturn"
@@ -1471,9 +1472,11 @@ static Type *declspec(Token **rest, Token *token, VarAttr *attr) {
     SHORT = 1 << 6,
     INT = 1 << 8,
     LONG = 1 << 10,
-    OTHER = 1 << 12,
-    SIGNED = 1 << 13,
-    UNSIGNED = 1 << 14
+    FLOAT = 1 << 12,
+    DOUBLE = 1 << 14,
+    OTHER = 1 << 16,
+    SIGNED = 1 << 17,
+    UNSIGNED = 1 << 18
   };
 
   Type *ty = cp_type(ty_int);
@@ -1565,6 +1568,10 @@ static Type *declspec(Token **rest, Token *token, VarAttr *attr) {
       counter += INT;
     } else if (equal(token, "long")) {
       counter += LONG;
+    } else if (equal(token, "float")) {
+      counter += FLOAT;
+    } else if (equal(token, "double")) {
+      counter += DOUBLE;
     } else if (equal(token, "signed")) {
       //signedは、複数回指定不可
       counter += SIGNED;
@@ -1623,6 +1630,12 @@ static Type *declspec(Token **rest, Token *token, VarAttr *attr) {
     case UNSIGNED + LONG + LONG:
     case UNSIGNED + LONG + LONG + INT:
       ty = cp_type(ty_ulong);
+      break;
+    case FLOAT:
+      ty = cp_type(ty_float);
+      break;
+    case DOUBLE:
+      ty = cp_type(ty_double);
       break;
     default:
       error_at(token->loc, "%s", "invalid type specifier");

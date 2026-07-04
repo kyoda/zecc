@@ -68,6 +68,9 @@ int main() {
   ASSERT(1, sizeof(char) << 31 >> 31);
   ASSERT(1, sizeof(char) << 63 >> 63);
 
+  ASSERT(4, sizeof(float));
+  ASSERT(8, sizeof(double));
+
   /* error
     ASSERT(8, ({ sizeof(int (*)[3][]);})); //gcc error
     ASSERT(8, ({ sizeof(int [][3]);}));
