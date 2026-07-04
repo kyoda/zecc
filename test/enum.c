@@ -14,10 +14,9 @@ int main() {
   ASSERT(4, ({ enum xtag { a = 1, b, c, d }; enum xtag x; sizeof(x); }));
   ASSERT(4, ({ enum { a, b, c } x; sizeof(x); }));
   ASSERT(4, ({ enum { a, b, c } x; sizeof(a); }));
-
+  ASSERT(-3, ({ enum { a = -4, b }; b; }));
 
   /*
-  ASSERT(-3, ({ enum { a = -4, b }; b; })); //error
   ASSERT(0, ({ int a = 0; enum { zero = a }; zero; })); gcc error
   ASSERT(2555, ({ enum { a = 2555 } x; a; })); //gcc error
   */

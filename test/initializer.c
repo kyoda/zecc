@@ -50,15 +50,6 @@ typedef struct { char a, b[]; } T2;
 T2 t3 = {'f', {'o', 'o', 0}};
 T2 t4 = {'f', 'o', 'o', 0};
 
-
-/* error
-  int g2 = g1 + 1;
-  int g13 = g1 ? 2 : 3;
-  int g13 = 1 ? g1 : 3;
-  struct { struct { char a; char b; } x; } gst5 = { {1, 2} };
-  char *p = gst5.x + 1; --> error
- */
-
 int main() {
   ASSERT(0, ({ int a = 0; int b = a; b; }));
   ASSERT(0, ({ int a[0] = {}; 0; }));

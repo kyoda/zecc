@@ -108,15 +108,8 @@ int no_name(int a) {
   return a;
 }
 
-/* error
-//int no_name(int a) {
-//    ^ no_name: redefinition of function
-
-int no_name(int a) {
-  return a;
-}
-
+/* gcc ok
 int no_name2(int) {
-  return 0;
+  return;
 }
 */

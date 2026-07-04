@@ -19,14 +19,14 @@ test/%.o: zecc test/%.c
 # common は、%.cに含まれないように'.c'を外している
 	$(CC) -o $@ test/$*.s -xc test/common
 
-test: $(TEST_OBJS)
+zecctest: $(TEST_OBJS)
 # $^ は、依存関係（$(TEST_OBJS)）の全てのファイルを表す
 # $$i としているのは、Makefileの変数ではなく、シェルの変数として扱うため
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	test/driver.sh
-	test/test-error.sh
+	test/test-error.sh zecc
 
-# ccのテスト用
+# gccのテスト用
 CCTEST_OBJS=$(TEST_SRCS:.c=.out)
 
 test/%.out: test/%.c
@@ -35,6 +35,9 @@ test/%.out: test/%.c
 cctest: $(CCTEST_OBJS)
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	test/driver.sh
+	test/test-error.sh gcc
+
+test: cctest zecctest
 
 clean:
 	rm -f zecc *.o *~ tmp* $(CCTEST_OBJS) $(TEST_OBJS) $(TEST_AS)
@@ -57,7 +60,7 @@ self: zecc
 
 	@echo "セルフコンパイル完了: zecc-self2 が生成されました"
 
-.PHONY: test clean
+.PHONY: zecc test zecctest cctest self clean
 
 # この書き方だと、すべての .o ファイルがすべての .c ファイルに依存することになる
 # $(OBJS): $(SRCS)

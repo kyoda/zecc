@@ -73,8 +73,6 @@ int main() {
 
   /* error
     ASSERT(8, ({ sizeof(int (*)[3][]);})); //gcc error
-    ASSERT(8, ({ sizeof(int [][3]);}));
-    ASSERT(4, sizeof(signed signed));
   */
 
   printf("OK\n");

@@ -50,10 +50,6 @@ int main() {
   ASSERT(1, _Alignof(char) << 63 >> 63);
   ASSERT(1, ({ char x; _Alignof(x) << 63 >> 63; }));
 
-  /* error
-    ASSERT(1, _Alignof char);
-  */
-
   printf("OK\n");
   return 0;
 }

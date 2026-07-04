@@ -37,10 +37,6 @@ int main() {
   ASSERT(3, ((Tree){1, 2, 3}).rhs);
   ASSERT(3, add((int[]){1, 2}));
 
-  /* error
-    ASSERT(3, add({1, 2}));
-  */
-  
   printf("OK\n");
   return 0;
 }

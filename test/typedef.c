@@ -24,10 +24,6 @@ int main() {
   ASSERT(4, ({ typedef myint myint3; myint3 a; sizeof(a);}));
   ASSERT(4, ({ myint typedef myint3; myint3 a; sizeof(a);}));
 
-  /* error
-  ASSERT(0, ({ typedef int myint; long long myint a; 0;}));
-  */
-
   printf("OK\n");
   return 0;
 }
