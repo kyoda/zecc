@@ -4,6 +4,7 @@
 *.out
 tmp*
 9cc
+zecc
 mytest
 .vscode/settings.json
 test/debug.c

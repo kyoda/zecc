@@ -1,4 +1,4 @@
-#include "9cc.h"
+#include "zecc.h"
 char *user_input;
 char *infile;
 

@@ -1,4 +1,4 @@
-#include "9cc.h"
+#include "zecc.h"
 
 Type *ty_void = &(Type){.kind = TY_VOID, .size = 1, .align = 1};
 Type *ty_bool = &(Type){.kind = TY_BOOL, .size = 1, .align = 1};

@@ -1,12 +1,16 @@
-# my9cc
+# zecc
 
-A small C compiler created by following the [低レイヤを知りたい人のためのCコンパイラ作成入門](https://www.sigbus.info/compilerbook) by @rui314.  
-This project is inspired by and based on [chibicc](https://github.com/rui314/chibicc), a minimal C compiler written in C.
+**Zephyr C Compiler**
+
+A small self-hosting C compiler created while studying the book *[低レイヤを知りたい人のためのCコンパイラ作成入門](https://www.sigbus.info/compilerbook)* by @rui314.
+
+The implementation is inspired by and references parts of [chibicc](https://github.com/rui314/chibicc), a minimal C compiler written in C, but it has evolved independently with its own design and implementation.
 
 ## Overview
 
-`my9cc` is a self-hosted learning project that implements a subset of the C language, including parsing, semantic analysis, and x86-64 code generation.  
-It targets the System V AMD64 ABI and outputs AT&T-style assembly code.
+**zecc** is a self-hosting C compiler that implements a subset of the C language, including lexical analysis, parsing, semantic analysis, and x86-64 code generation.
+
+It targets the System V AMD64 ABI and currently generates Intel-syntax x86-64 assembly.
 
 ## Features
 
@@ -41,7 +45,7 @@ It targets the System V AMD64 ABI and outputs AT&T-style assembly code.
 Compile a C file to assembly:
 
 ```sh
-./my9cc test/hello.c > hello.s
+./zecc test/hello.c > hello.s
 ```
 
 Assemble and run using GCC:

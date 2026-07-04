@@ -1,4 +1,4 @@
-#include "9cc.h"
+#include "zecc.h"
 
 static char *infile;
 static char *out_opt;

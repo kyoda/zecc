@@ -8,14 +8,14 @@ TEST_SRCS=$(wildcard test/*.c)
 TEST_OBJS=$(TEST_SRCS:.c=.o)
 TEST_AS=$(TEST_SRCS:.c=.s)
 
-9cc: $(OBJS)
-		$(CC) ${CFLAGS} -o 9cc $(OBJS) $(LDFLAGS)
+zecc: $(OBJS)
+		$(CC) ${CFLAGS} -o zecc $(OBJS) $(LDFLAGS)
 
-$(OBJS): 9cc.h
+$(OBJS): zecc.h
 
-test/%.o: 9cc test/%.c
+test/%.o: zecc test/%.c
 # -E -P -C で、プリプロセスだけ処理
-	$(CC) -o- -E -P -C test/$*.c | ./9cc -o test/$*.s -
+	$(CC) -o- -E -P -C test/$*.c | ./zecc -o test/$*.s -
 # common は、%.cに含まれないように'.c'を外している
 	$(CC) -o $@ test/$*.s -xc test/common
 
@@ -24,6 +24,7 @@ test: $(TEST_OBJS)
 # $$i としているのは、Makefileの変数ではなく、シェルの変数として扱うため
 	for i in $^; do echo $$i; ./$$i || exit 1; echo; done
 	test/driver.sh
+	test/test-error.sh
 
 # ccのテスト用
 CCTEST_OBJS=$(TEST_SRCS:.c=.out)
@@ -36,25 +37,25 @@ cctest: $(CCTEST_OBJS)
 	test/driver.sh
 
 clean:
-	rm -f 9cc *.o *~ tmp* $(CCTEST_OBJS) $(TEST_OBJS) $(TEST_AS)
+	rm -f zecc *.o *~ tmp* $(CCTEST_OBJS) $(TEST_OBJS) $(TEST_AS)
 
 
 # -----------------------------
 # セルフコンパイルテスト
 # -----------------------------
-self: 9cc
+self: zecc
 # 1. gcc で前処理だけする (-E)
-	$(CC) -E -P $(SRCS) > 9cc_pre.i
+	$(CC) -E -P $(SRCS) > zecc_pre.i
 
 # 2. 自作コンパイラでアセンブリ生成
-	./9cc -o tmp.s 9cc_pre.i
-	$(CC) -o 9cc-self tmp.s
+	./zecc -o tmp.s zecc_pre.i
+	$(CC) -o zecc-self tmp.s
 
-# 3. 出来た 9cc-self でもう一度セルフビルド
-	./9cc-self -o tmp2.s 9cc_pre.i
-	$(CC) -o 9cc-self2 tmp2.s
+# 3. 出来た zecc-self でもう一度セルフビルド
+	./zecc-self -o tmp2.s zecc_pre.i
+	$(CC) -o zecc-self2 tmp2.s
 
-	@echo "セルフコンパイル完了: my-9cc-self2 が生成されました"
+	@echo "セルフコンパイル完了: zecc-self2 が生成されました"
 
 .PHONY: test clean
 

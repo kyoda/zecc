@@ -1,4 +1,4 @@
-#include "9cc.h"
+#include "zecc.h"
 
 static Obj *current_fn;
 static FILE *out;
