@@ -34,8 +34,18 @@ static void pop(char *arg) {
   depth--;
 }
 
+// Load the value pointed to by rax.
 static void load(Type *ty) {
-  if (ty->kind == TY_ARRAY || ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
+  switch (ty->kind) {
+  case TY_ARRAY:
+  case TY_STRUCT:
+  case TY_UNION:
+    return;
+  case TY_FLOAT:
+    println("  movss xmm0, [rax]");
+    return;
+  case TY_DOUBLE:
+    println("  movsd xmm0, [rax]");
     return;
   }
 
@@ -49,7 +59,11 @@ static void load(Type *ty) {
     println("  %s eax, WORD PTR [rax]", mov);
     break;
   case 4:
-    println("  %s rax, DWORD PTR [rax]", mov);
+    if (ty->is_unsigned) {
+      println("  mov eax, DWORD PTR [rax]");
+    } else {
+      println("  movsxd rax, DWORD PTR [rax]");
+    }
     break;
   default:
     println("  mov rax, [rax]");
@@ -58,37 +72,46 @@ static void load(Type *ty) {
 
 }
 
+/*
+  rhs is in rax or xmm0
+*/
 static void store(Type *ty) {
-  pop("rdi"); //rhs
-  pop("rax"); //lhs
+  pop("rdi"); //lhs
 
-  if (ty->kind == TY_STRUCT || ty->kind == TY_UNION) {
+  switch (ty->kind) {
+  case TY_STRUCT:
+  case TY_UNION:
     for (int i = 0; i < ty->size; i++) {
-      println("  mov r8b, [rdi + %d]", i);
-      println("  mov [rax + %d], r8b", i);
+      println("  mov r8b, [rax + %d]", i);
+      println("  mov [rdi + %d], r8b", i);
     }
 
-    println("  mov rax, rdi");
+    return;
+  case TY_FLOAT:
+    // For ND_NUM, floating-point literals are returned in XMM0.
+    println("  movss [rdi], xmm0");
+    return;
+  case TY_DOUBLE:
+    println("  movsd [rdi], xmm0");
     return;
   }
 
 
   switch (ty->size) {
   case 1:
-    println("  mov [rax], dil");
+    println("  mov [rdi], al");
     break;
   case 2: 
-    println("  mov [rax], di");
+    println("  mov [rdi], ax");
     break;
   case 4: 
-    println("  mov [rax], edi");
+    println("  mov [rdi], eax");
     break;
   default:
-    println("  mov [rax], rdi");
+    println("  mov [rdi], rax");
     break;
   }
 
-  println("  mov rax, rdi");
 }
 
 static void gen_addr(Node *n) {
@@ -130,7 +153,7 @@ static void push_stacked(Node *n) {
   push();
 }
 
-enum {I8, I16, I32, I64, U8, U16, U32, U64};
+enum {I8, I16, I32, I64, U8, U16, U32, U64, F32, F64};
 static int getTypeId(Type *ty) {
   switch (ty->kind) {
   case TY_CHAR:
@@ -139,63 +162,433 @@ static int getTypeId(Type *ty) {
     return ty->is_unsigned ? U16 : I16;
   case TY_INT:
     return ty->is_unsigned ? U32 : I32;
+  case TY_FLOAT:
+    return F32;
+  case TY_DOUBLE:
+    return F64;
   default:
     return ty->is_unsigned ? U64 : I64;
   }
 }
 
 /*
-  拡張は3種類しかない。また、fromがsignedかunsignedかでmovsxかmovzxを選択する。
+
+  # Cast Overview
+
+  A cast operation has two responsibilities:
+
+  1. Type Conversion
+     Convert a value from the source type to the destination type
+     according to C language rules.
+
+  2. Normalization
+     Adjust the register representation to match the expected
+     internal representation of the destination type.
+
+     Even when the source and destination types are identical,
+     normalization may still be required.
+
+  ## 1. Integer -> Integer
+
+  Integer-to-integer casts are classified into three cases:
+
+  1. Sign extension
+     - Extend a signed integer with movsx/movsxd.
+
+  2. Zero extension
+     - Extend an unsigned integer with movzx.
+     - For 32-bit to 64-bit, writing to eax automatically clears
+       the upper 32 bits of rax.
+
+  3. Truncation
+     - Narrow an integer by discarding the upper bits.
+     - No special instruction is required for the truncation itself.
+
+                       integer cast
+                            |
+               +------------+------------+
+               |                         |
+            widening                  narrowing
+               |                         |
+         +-----+-----+                   |
+         |           |                   |
+    sign extend  zero extend         truncate
   
-  1. sign extend
-  2. zero extend
-  3. truncate(何もしない)
+  ### Basic Rules
 
-  [sign-extend]
-    + 同じbit数同士は、cast不要
-    + 32bit未満の値は、演算や比較の前に必要に応じて32bitへ拡張する。
-      - signedならmovsx、unsignedならmovzxを使う。
-      - 32bit値を64bit unsignedへ拡張する場合は、eaxへ書き込むことでrax上位32bitがゼロクリアされる。
-    + 下位bitから64bitに拡張する場合は32bitレジスタを直接64bitへ
-      - movsxで符号拡張
-      - 自動で上位bitは0埋めされる
-    + 上記以外の下位bitから64bitに拡張する場合は、上記の内容の通り32bit以下はeaxのため、32bit to 64bitと同じ
-  [zero-extend]
-  [truncate]
-    + 64bitから32bitへは、何もしない
-    + 上位bitから下位bitに縮小する場合は、32bitレジスタへ
-    + truncate時にmovsx/movzxするのではなく、truncate後の値を再び32bit以上として使うときにmovsx/movzxする
+  - Integer values smaller than 32 bits are normalized to 32 bits:
+      - signed   -> sign-extend with movsx
+      - unsigned -> zero-extend with movzx
+
+  - A cast between identical types does not change the C value,
+    but may require normalization of the register contents.
+
+    Integer values smaller than 32 bits are normalized to 32 bits.
+
+    Type   Normalization       Instruction
+    -----------------------------------------
+    I8     Sign extension      movsx eax, al
+    I16    Sign extension      movsx eax, ax
+    I32    None                -
+    I64    None                -
+    U8     Zero extension      movzx eax, al
+    U16    Zero extension      movzx eax, ax
+    U32    None                -
+    U64    None                -
+    F32    None                -
+    F64    None                -
+
+    Normalization is applied even when the source and destination
+    types are identical, if required by the internal register
+    representation.
+
+  - For example, u16 -> u16 uses movzx eax, ax to ensure that
+    the upper bits are cleared.
+
+  - Values smaller than 32 bits are normally extended to 32 bits first.
+    Extending them further to 64 bits then follows the 32 -> 64 rules.
+
+  - Writing to a 32-bit register automatically clears the upper
+    32 bits of the corresponding 64-bit register.
+
   
-   [tips]
-      movzx は 8bit/16bit → 32bit/64bit のゼロ拡張に使う
+  ### 1.1 Sign Extension
+  
+  - i8  -> i32 : movsx eax, al
+  - i16 -> i32 : movsx eax, ax
+  - i32 -> i64 : movsxd rax, eax
+  
+  
+  ### 1.2 Zero Extension
+  
+  - u8  -> u32 : movzx eax, al
+  - u16 -> u32 : movzx eax, ax
+  - u32 -> u64 : mov eax, eax
+  
+  movzx supports:
+    movzx r32, r8/r16
+    movzx r64, r8/r16
+  
+  There is no:
+    movzx r64, r32
+  
+  For 32 -> 64 zero extension, writing to the 32-bit register
+  automatically clears the upper 32 bits:
+  
+    mov eax, eax
+  
+  
+  ### 1.3 Truncation
+  
+  Narrowing discards the upper bits.
+  
+  The truncation itself does not require movsx or movzx.
+  movsx/movzx is needed when the truncated value is normalized
+  again to a wider register.
+  
+  Examples:
+  
+  - i64 -> i8:
+      use al, then movsx eax, al
+  
+  - i64 -> u8:
+      use al, then movzx eax, al
+  
+  - i64 -> i16:
+      use ax, then movsx eax, ax
+  
+  - i64 -> u16:
+      use ax, then movzx eax, ax
+  
+  - i64 -> i32/u32:
+      use eax
+  
+  ## 2. Integer -> Floating-point
+  
+  ### 2.1 Signed Integer -> Floating-point
+  
+  - i32 -> f32 : cvtsi2ss xmm0, eax
+  - i32 -> f64 : cvtsi2sd xmm0, eax
+  - i64 -> f32 : cvtsi2ss xmm0, rax
+  - i64 -> f64 : cvtsi2sd xmm0, rax
+  
+  Small signed integers (i8/i16) are already normalized to i32,
+  so the i32 conversion instructions can be used.
+  
+  ### 2.2 Small Unsigned Integer -> Floating-point
+  
+  u8/u16 values fit in signed i32 after zero extension.
+  
+  - u8/u16 -> f32 : cvtsi2ss xmm0, eax
+  - u8/u16 -> f64 : cvtsi2sd xmm0, eax
+  
+  ### 2.3 U32 -> Floating-point
+  
+  A u32 value may not fit in signed i32, but the entire u32 range
+  fits in signed i64.
+  
+  Zero-extend u32 to u64 first, then use the signed 64-bit conversion.
+  
+  - u32 -> f32:
+      mov eax, eax
+      cvtsi2ss xmm0, rax
+  
+  - u32 -> f64:
+      mov eax, eax
+      cvtsi2sd xmm0, rax
+  
+  ### 2.4 U64 -> Floating-point
+  
+  SSE has no instruction for converting the entire u64 range directly.
+  
+  If the value is <= INT64_MAX:
+    - Convert directly with cvtsi2ss/cvtsi2sd.
+  
+  If the value is > INT64_MAX:
+    1. Shift right by one so it fits in signed i64.
+    2. Preserve the discarded low bit:
+         (x >> 1) | (x & 1)
+    3. Convert it as signed i64.
+    4. Multiply the result by two.
+  
+  The low bit preserves the rounding direction that would otherwise
+  be lost by the right shift.
+  
+  Instructions:
+    - u64 -> f32 : cvtsi2ss + addss
+    - u64 -> f64 : cvtsi2sd + addsd
+  
+  
+  ## 3. Floating-point -> Integer
+  
+  Floating-point to integer casts use truncation toward zero.
+  
+  - 3.9  -> 3
+  - -3.9 -> -3
+  
+  This is different from integer truncation:
+    - Integer truncation: discard upper bits.
+    - `cvtt` truncation: discard the fractional part toward zero.
+  
+  ### 3.1 Floating-point -> Signed Integer
+  
+  - f32 -> i32 : cvttss2si eax, xmm0
+  - f32 -> i64 : cvttss2si rax, xmm0
+  - f64 -> i32 : cvttsd2si eax, xmm0
+  - f64 -> i64 : cvttsd2si rax, xmm0
+  
+  ### 3.2 Floating-point -> Small Integer
+  
+  First convert to i32, then normalize the lower bits.
+  
+  Examples:
+  
+  - f32 -> i8:
+      cvttss2si eax, xmm0
+      movsx eax, al
+  
+  - f32 -> u8:
+      cvttss2si eax, xmm0
+      movzx eax, al
+  
+  - f64 -> i16:
+      cvttsd2si eax, xmm0
+      movsx eax, ax
+  
+  - f64 -> u16:
+      cvttsd2si eax, xmm0
+      movzx eax, ax
+  
+  ### 3.3 Floating-point -> U32
+  
+  The entire u32 range fits in signed i64.
+  
+  Convert to signed i64 and use the lower 32 bits.
+  
+  - f32 -> u32 : cvttss2si rax, xmm0
+  - f64 -> u32 : cvttsd2si rax, xmm0
+  
+  ### 3.4 Floating-point -> U64
+  
+  The entire u64 range does not fit in signed i64.
+  
+  Special handling is required for values above INT64_MAX.
+  
+  
+  ## 4. Floating-point -> Floating-point
+  
+  ### 4.1 F32 -> F64
+  
+  - Increase precision.
+  - Instruction:
+      cvtss2sd xmm0, xmm0
+  
+  ### 4.2 F64 -> F32
+  
+  - Reduce precision and round to the nearest representable f32 value.
+  - Instruction:
+      cvtsd2ss xmm0, xmm0
+  
+  
+  # Implementation Summary
+  
+  Integer -> Integer:
+    movsx / movsxd / movzx / register truncation
+  
+  Integer -> Floating-point:
+    cvtsi2ss / cvtsi2sd
+    u64 requires special handling
+  
+  Floating-point -> Integer:
+    cvttss2si / cvttsd2si
+    i8/i16/u8/u16 require normalization after conversion
+    u64 requires special handling
+  
+  Floating-point -> Floating-point:
+    cvtss2sd / cvtsd2ss
 
-        movzx r32, r8/r16
-        movzx r64, r8/r16
-
-      ※ 32bit → 64bit の movzx は存在しない
-        movzx r64, r32  // 不可
-
-      ※ 32bit → 64bit のゼロ拡張は、
-         r32 に書き込むことで r64 の上位32bitが自動で0になる
 */
 
-static char i8to32[] = "movsx eax, al";
-static char u8to32[] = "movzx eax, al";
-static char i16to32[] = "movsx eax, ax";
-static char u16to32[] = "movzx eax, ax";
-static char i32to64[] = "movsxd rax, eax";
-static char u32to64[] = "mov eax, eax"; // eax書けば上位は0埋めされる
+static char i8toi32[] = "movsx eax, al";
+static char u8toi32[] = "movzx eax, al";
+static char i16toi32[] = "movsx eax, ax";
+static char u16toi32[] = "movzx eax, ax";
+static char i32toi64[] = "movsxd rax, eax";
+static char u32toi64[] = "mov eax, eax"; // eax書けば上位は0埋めされる
 
-static char *cast_table[][8] = {
-  // to I8, I16, I32, I64, U8, U16, U32, U64
-  {i8to32, i8to32, i8to32, i32to64, i8to32, i8to32, i8to32, i32to64},     //from I8
-  {i8to32, i16to32, i16to32, i32to64, i8to32, i16to32, i16to32, i32to64}, //from I16
-  {i8to32, i16to32, NULL, i32to64, i8to32, i16to32, NULL, i32to64},       //from I32
-  {i8to32, i16to32, NULL, NULL, i8to32, i16to32, NULL, NULL},             //from I64
-  {u8to32, u8to32, u8to32, u32to64, u8to32, u8to32, u8to32, u32to64},     //from U8
-  {u8to32, u16to32, u16to32, u32to64, u8to32, u16to32, u16to32, u32to64}, //from U16
-  {u8to32, u16to32, NULL, u32to64, u8to32, u16to32, NULL, u32to64},       //from U32
-  {u8to32, u16to32, NULL, NULL, u8to32, u16to32, NULL, NULL}              //from U64
+/*
+ * Floating-point casts
+ */
+// Signed integer to floating-point
+static char i32tof32[] = "cvtsi2ss xmm0, eax";
+static char i32tof64[] = "cvtsi2sd xmm0, eax";
+static char i64tof32[] = "cvtsi2ss xmm0, rax";
+static char i64tof64[] = "cvtsi2sd xmm0, rax";
+// Floating-point to signed integer
+// cvtt truncates the fractional part toward zero.
+static char f32toi32[] = "cvttss2si eax, xmm0";
+static char f32toi64[] = "cvttss2si rax, xmm0";
+static char f64toi32[] = "cvttsd2si eax, xmm0";
+static char f64toi64[] = "cvttsd2si rax, xmm0";
+
+static char f32tof64[] = "cvtss2sd xmm0, xmm0";
+static char f64tof32[] = "cvtsd2ss xmm0, xmm0";
+
+/*
+  unsigned 32-bit integer to floating-point
+    Use a signed 64-bit conversion because the entire u32 range fits in i64.
+*/
+static char u32tof32[] = "mov eax, eax; cvtsi2ss xmm0, rax";
+static char u32tof64[] = "mov eax, eax; cvtsi2sd xmm0, rax";
+static char f32tou32[] = "cvttss2si rax, xmm0";
+static char f64tou32[] = "cvttsd2si rax, xmm0";
+
+// other
+static char i8tof32[] = "cvtsi2ss xmm0, eax";
+static char i8tof64[] = "cvtsi2sd xmm0, eax";
+static char u8tof32[] = "cvtsi2ss xmm0, eax";
+static char u8tof64[] = "cvtsi2sd xmm0, eax";
+
+/*
+  Convert u64 to double.
+
+  cvtsi2sd accepts only signed 64-bit integers, so values above
+  INT64_MAX cannot be converted directly.
+
+  For such values:
+    1. Shift right by one so the value fits in the signed range.
+    2. Preserve the discarded low bit:
+         (x >> 1) | (x & 1)
+    3. Convert to double and multiply by two.
+
+  Why preserve the low bit?
+    The right shift may turn a value that was just above a rounding
+    midpoint into an exact midpoint. The low bit preserves the fact
+    that the original value was above the midpoint.
+
+  Example:
+    Around 2^63, adjacent double values are 2048 apart:
+
+      2^63          = 9223372036854775808
+      midpoint      = 9223372036854776832  (+1024)
+      next double   = 9223372036854777856  (+2048)
+
+    Let:
+      x = 2^63 + 1025
+        = 9223372036854776833
+
+    x is 1 above the midpoint, so it must round up to 2^63 + 2048.
+
+    Without preserving the low bit:
+      x >> 1 = 2^62 + 512
+             = 4611686018427388416
+
+      Around 2^62, adjacent doubles are 1024 apart, so +512 is
+      exactly the midpoint. The information that x was 1 above
+      the midpoint has been lost.
+
+    With the low bit:
+      x & 1 = 1
+      (x >> 1) | (x & 1)
+        = (2^62 + 512) | 1
+        = 2^62 + 513
+
+      +513 is 1 above the midpoint, so cvtsi2sd rounds up to
+      2^62 + 1024.
+
+      Multiplying by two gives:
+        2 * (2^62 + 1024)
+        = 2^63 + 2048
+
+    Thus, the low bit does not significantly change the value.
+    It preserves the rounding direction that would otherwise be
+    lost by the right shift.
+*/
+static char u64tof64[] = 
+  "test rax, rax \n"
+  "js 1f \n"
+  "pxor xmm0, xmm0 \n"
+  "cvtsi2sd xmm0, rax \n"
+  "jmp 2f \n"
+  "1: \n"
+  "  mov rdi, rax \n"
+  "  and eax, 1 \n"
+  "  pxor xmm0, xmm0 \n"
+  "  shr rdi, 1 \n"
+  "  or rdi, rax \n"
+  "  cvtsi2sd xmm0, rdi \n"
+  "  addsd xmm0, xmm0 \n"
+  "2: \n";
+  
+static char u64tof32[] = 
+  "test rax, rax \n"
+  "js 1f \n"
+  "pxor xmm0, xmm0 \n"
+  "cvtsi2ss xmm0, rax \n"
+  "jmp 2f \n"
+  "1: \n"
+  "  mov rdi, rax \n"
+  "  and eax, 1 \n"
+  "  pxor xmm0, xmm0 \n"
+  "  shr rdi, 1 \n"
+  "  or rdi, rax \n"
+  "  cvtsi2ss xmm0, rdi \n"
+  "  addss xmm0, xmm0 \n"
+  "2: \n";
+
+
+static char *cast_table[][10] = {
+  // to I8, I16, I32, I64, U8, U16, U32, U64, F32, F64
+  {i8toi32, i8toi32, i8toi32, i32toi64, i8toi32, i8toi32, i8toi32, i32toi64, i8tof32, i8tof64},     //from I8
+  {i8toi32, i16toi32, i16toi32, i32toi64, i8toi32, i16toi32, i16toi32, i32toi64, i8tof32, i8tof64}, //from I16
+  {i8toi32, i16toi32, NULL, i32toi64, i8toi32, i16toi32, NULL, i32toi64, i32tof32, i32tof64},       //from I32
+  {i8toi32, i16toi32, NULL, NULL, i8toi32, i16toi32, NULL, NULL, i64tof32, i64tof64},               //from I64
+  {u8toi32, u8toi32, u8toi32, u32toi64, u8toi32, u8toi32, u8toi32, u32toi64, u8tof32, u8tof64},     //from U8
+  {u8toi32, u16toi32, u16toi32, u32toi64, u8toi32, u16toi32, u16toi32, u32toi64, u8tof32, u8tof64}, //from U16
+  {u8toi32, u16toi32, NULL, u32toi64, u8toi32, u16toi32, NULL, u32toi64, u32tof32, u32tof64},       //from U32
+  {u8toi32, u16toi32, NULL, NULL, u8toi32, u16toi32, NULL, NULL, u64tof32, u64tof64},               //from U64
+  {NULL, NULL, f32toi32, f32toi64, NULL, NULL, f32tou32, NULL, NULL, f32tof64},                     //from F32
+  {NULL, NULL, f64toi32, f64toi64, NULL, NULL, f64tou32, NULL, f64tof32, NULL}                      //from F64
 };
 
 static void cast(Type *from, Type *to) {
@@ -254,6 +647,7 @@ static void gen_expr(Node *n) {
       +---------+------------+-------------------+
 
     */
+
     // Reinterpret floating-point values as integer bit patterns.
     union {
       float f32;
@@ -262,7 +656,10 @@ static void gen_expr(Node *n) {
       uint64_t u64;
     } u;
 
-    // Move float/double literal to xmm0 via its IEEE754 bit pattern.
+    /*
+      XMM registers cannot load floating-point immediates directly.
+      Load the IEEE 754 bit pattern into a GPR first, then move it to xmm0.
+    */
     switch (n->ty->kind) {
     case TY_FLOAT:
       u.f32 = n->fval;
@@ -526,9 +923,8 @@ static void gen_expr(Node *n) {
     return;
   case ND_ASSIGN:
     gen_addr(n->lhs);
-    push();
-    gen_expr(n->rhs);
-    push();
+    push(); // Save the destination address.
+    gen_expr(n->rhs); // Result is in RAX or XMM0.
 
     store(n->ty);
 

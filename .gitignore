@@ -5,6 +5,7 @@
 tmp*
 9cc
 zecc
+zecc_pre.i
 mytest
 .vscode/settings.json
 test/debug.c
