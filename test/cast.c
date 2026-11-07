@@ -88,12 +88,84 @@ int main() {
   ASSERT(2, ((unsigned)-100)%7);
   ASSERT(6, ((unsigned long)-100)%9);
 
+  // i8 -> i32 (movsx eax, al)
+  ASSERT(-1, (int)(signed char)-1);
+  ASSERT(-128, (int)(signed char)-128);
+  ASSERT(127, (int)(signed char)127);
+
+  // u8 -> i32 (movzx eax, al)
+  ASSERT(0, (int)(unsigned char)0);
+  ASSERT(127, (int)(unsigned char)127);
+  ASSERT(255, (int)(unsigned char)255);
+
+  // i16 -> i32 (movsx eax, ax)
+  ASSERT(-1, (int)(short)-1);
+  ASSERT(-32768, (int)(short)-32768);
+  ASSERT(32767, (int)(short)32767);
+
+  // u16 -> i32 (movzx eax, ax)
+  ASSERT(0, (int)(unsigned short)0);
+  ASSERT(32767, (int)(unsigned short)32767);
   ASSERT(65535, (int)(unsigned short)65535);
+
+  // i32 -> i64 (movsxd rax, eax)
+  ASSERT(-1, (long)(int)-1);
+  ASSERT(-2147483647-1, (long)(int)(-2147483647-1));
+
+  // u32 -> i64 (mov eax, eax)
+  ASSERT(1, (unsigned long)(unsigned int)-1 == 4294967295UL);
+
+  // Truncation: i32 -> u8
+  ASSERT(255, (unsigned char)255);
+  ASSERT(0, (unsigned char)256);
+  ASSERT(255, (unsigned char)511);
+
+  // Truncation: i32 -> u16
+  ASSERT(65535, (unsigned short)65535);
+  ASSERT(0, (unsigned short)65536);
+
+  // other
   ASSERT(65535, ({ unsigned short x = 65535; x; }));
   ASSERT(65535, ({ unsigned short x = 65535; (int)x; }));
 
   ASSERT(-1, ({ typedef short T; T x = 65535; (int)x; }));
   ASSERT(65535, ({ typedef unsigned short T; T x = 65535; (int)x; }));
+
+  ASSERT(65535, (unsigned short)(signed short)-1);
+  ASSERT(65535, ({ unsigned short x = (signed short)-1; x; }));
+  ASSERT(65535, (int)(unsigned short)(signed short)-1);
+  ASSERT(1, ((unsigned short)(signed short)-1) == 65535);
+
+  ASSERT(65535, ({
+    unsigned short x;
+    unsigned int y = (x = (short)-1);
+    x;
+  }));
+
+  ASSERT(65535, ({
+    unsigned short x;
+    unsigned int y = (x = (short)-1);
+    y;
+  }));
+
+  ASSERT(-1, (signed char)(unsigned short)65535);
+  ASSERT(255, (long)(unsigned char)255);
+  ASSERT(65535, (long)(unsigned short)65535);
+  ASSERT(65535, (long)(unsigned short)(long)-1);
+  ASSERT(65535, (unsigned long)(unsigned short)65535);
+
+  ASSERT(255, (unsigned char)255);
+  ASSERT(255, (unsigned char)(signed long)255);
+  ASSERT(65535, (unsigned short)65535);
+  ASSERT(65535, (signed long)(unsigned short)65535);
+  ASSERT(65535, (unsigned long)(unsigned short)65535);
+
+  //ASSERT(3, (int)(unsigned char)3.5);
+  //ASSERT(3, (int)(unsigned char)3.9);
+  //ASSERT(255, (int)(unsigned char)255.9);
+  //ASSERT(3, (int)(signed char)3.5);
+  //ASSERT(-1, (int)(signed char)-1.5);
+  //ASSERT(65535, (int)(unsigned short)65535.9);
 
   printf("OK\n");
   return 0;

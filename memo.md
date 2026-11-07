@@ -28,6 +28,11 @@
 | 式     | Dereference Operator       | ポインタの指す先の値を取得        | `*p`                                  | 単項演算子            |
 | 式     | Address-of Operator        | 変数などのアドレスを取得         | `&x`                                  | lvalue → pointer |
 | データ構造 | Self-referential Structure | 自分自身の型へのポインタを持つ構造体   | `struct Node { struct Node *next; };` | リスト・木で使用         |
+| アセンブリ | Instruction | CPUが実行する命令 | `add eax, 10` | 命令全体を指す |
+| アセンブリ | Mnemonic | CPU命令を人間が読めるように表した名前 | `mov`, `add`, `sub`, `movsx` | 命令の記憶用表記 |
+| アセンブリ | Opcode | 機械語で操作の種類を指定する部分 | `83`（`add eax, 10` の場合） | 機械語の命令エンコーディングの一部 |
+| アセンブリ | Directive | アセンブラへの指示 | `.data`, `.text`, `.global` | CPU命令ではない |
+| アセンブリ | Immediate | 命令のオペランドとして直接指定する定数値 | `mov eax, 10` の `10` | レジスタやメモリから読み出す値ではない |
 
 ---
 

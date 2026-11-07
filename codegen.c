@@ -449,12 +449,18 @@ static int getTypeId(Type *ty) {
 
 */
 
+/*
+ * In x86-64, writing to a 32-bit register automatically zeroes
+ * the upper 32 bits of the corresponding 64-bit register.
+ * Sign extension and zero extension are used depending on
+ * whether the source type is signed or unsigned.
+ */
 static char i8toi32[] = "movsx eax, al";
 static char u8toi32[] = "movzx eax, al";
 static char i16toi32[] = "movsx eax, ax";
 static char u16toi32[] = "movzx eax, ax";
 static char i32toi64[] = "movsxd rax, eax";
-static char u32toi64[] = "mov eax, eax"; // eax書けば上位は0埋めされる
+static char u32toi64[] = "mov eax, eax";
 
 /*
  * Floating-point casts
@@ -481,7 +487,9 @@ static char f64tof32[] = "cvtsd2ss xmm0, xmm0";
 static char u32tof32[] = "mov eax, eax; cvtsi2ss xmm0, rax";
 static char u32tof64[] = "mov eax, eax; cvtsi2sd xmm0, rax";
 static char f32tou32[] = "cvttss2si rax, xmm0";
+static char f32tou64[] = "cvttss2si rax, xmm0;";
 static char f64tou32[] = "cvttsd2si rax, xmm0";
+static char f64tou64[] = "cvttsd2si rax, xmm0;";
 
 // other
 static char i8tof32[] = "cvtsi2ss xmm0, eax";
@@ -579,16 +587,30 @@ static char u64tof32[] =
 
 static char *cast_table[][10] = {
   // to I8, I16, I32, I64, U8, U16, U32, U64, F32, F64
-  {i8toi32, i8toi32, i8toi32, i32toi64, i8toi32, i8toi32, i8toi32, i32toi64, i8tof32, i8tof64},     //from I8
-  {i8toi32, i16toi32, i16toi32, i32toi64, i8toi32, i16toi32, i16toi32, i32toi64, i8tof32, i8tof64}, //from I16
-  {i8toi32, i16toi32, NULL, i32toi64, i8toi32, i16toi32, NULL, i32toi64, i32tof32, i32tof64},       //from I32
-  {i8toi32, i16toi32, NULL, NULL, i8toi32, i16toi32, NULL, NULL, i64tof32, i64tof64},               //from I64
-  {u8toi32, u8toi32, u8toi32, u32toi64, u8toi32, u8toi32, u8toi32, u32toi64, u8tof32, u8tof64},     //from U8
-  {u8toi32, u16toi32, u16toi32, u32toi64, u8toi32, u16toi32, u16toi32, u32toi64, u8tof32, u8tof64}, //from U16
+  {i8toi32, i8toi32, i8toi32, i32toi64, u8toi32, u8toi32, i8toi32, i32toi64, i8tof32, i8tof64},     //from I8
+  {i8toi32, i16toi32, i16toi32, i32toi64, u8toi32, u16toi32, i16toi32, i32toi64, i8tof32, i8tof64}, //from I16
+  {i8toi32, i16toi32, NULL, i32toi64, u8toi32, u16toi32, NULL, i32toi64, i32tof32, i32tof64},       //from I32
+  {i8toi32, i16toi32, NULL, NULL, u8toi32, u16toi32, NULL, NULL, i64tof32, i64tof64},               //from I64
+  {u8toi32, u8toi32, u8toi32, u8toi32, u8toi32, u8toi32, u8toi32, u32toi64, u8tof32, u8tof64},      //from U8
+  {u8toi32, u16toi32, u16toi32, u16toi32, u8toi32, u16toi32, u16toi32, u32toi64, u8tof32, u8tof64}, //from U16
   {u8toi32, u16toi32, NULL, u32toi64, u8toi32, u16toi32, NULL, u32toi64, u32tof32, u32tof64},       //from U32
   {u8toi32, u16toi32, NULL, NULL, u8toi32, u16toi32, NULL, NULL, u64tof32, u64tof64},               //from U64
-  {NULL, NULL, f32toi32, f32toi64, NULL, NULL, f32tou32, NULL, NULL, f32tof64},                     //from F32
-  {NULL, NULL, f64toi32, f64toi64, NULL, NULL, f64tou32, NULL, f64tof32, NULL}                      //from F64
+  {NULL, NULL, f32toi32, f32toi64, NULL, NULL, f32tou32, f32tou64, NULL, f32tof64},                     //from F32
+  {NULL, NULL, f64toi32, f64toi64, NULL, NULL, f64tou32, f64tou64, f64tof32, NULL}                      //from F64
+};
+
+static char *print_cast_table[][10] = {
+  // to I8, I16, I32, I64, U8, U16, U32, U64, F32, F64
+  {"i8_to_i8",   "i8_to_i16",   "i8_to_i32",   "i8_to_i64",   "i8_to_u8",   "i8_to_u16",   "i8_to_u32",   "i8_to_u64",   "i8_to_f32",   "i8_to_f64"},   //from I8
+  {"i16_to_i8",  "i16_to_i16",  "i16_to_i32",  "i16_to_i64",  "i16_to_u8",  "i16_to_u16",  "i16_to_u32",  "i16_to_u64",  "i16_to_f32",  "i16_to_f64"},  //from I16
+  {"i32_to_i8",  "i32_to_i16",  "i32_to_i32",  "i32_to_i64",  "i32_to_u8",  "i32_to_u16",  "i32_to_u32",  "i32_to_u64",  "i32_to_f32",  "i32_to_f64"},  //from I32
+  {"i64_to_i8",  "i64_to_i16",  "i64_to_i32",  "i64_to_i64",  "i64_to_u8",  "i64_to_u16",  "i64_to_u32",  "i64_to_u64",  "i64_to_f32",  "i64_to_f64"},  //from I64
+  {"u8_to_i8",   "u8_to_i16",   "u8_to_i32",   "u8_to_i64",   "u8_to_u8",   "u8_to_u16",   "u8_to_u32",   "u8_to_u64",   "u8_to_f32",   "u8_to_f64"},   //from U8
+  {"u16_to_i8",  "u16_to_i16",  "u16_to_i32",  "u16_to_i64",  "u16_to_u8",  "u16_to_u16",  "u16_to_u32",  "u16_to_u64",  "u16_to_f32",  "u16_to_f64"},  //from U16
+  {"u32_to_i8",  "u32_to_i16",  "u32_to_i32",  "u32_to_i64",  "u32_to_u8",  "u32_to_u16",  "u32_to_u32",  "u32_to_u64",  "u32_to_f32",  "u32_to_f64"},  //from U32
+  {"u64_to_i8",  "u64_to_i16",  "u64_to_i32",  "u64_to_i64",  "u64_to_u8",  "u64_to_u16",  "u64_to_u32",  "u64_to_u64",  "u64_to_f32",  "u64_to_f64"},  //from U64
+  {"f32_to_i8",  "f32_to_i16",  "f32_to_i32",  "f32_to_i64",  "f32_to_u8",  "f32_to_u16",  "f32_to_u32",  "f32_to_u64",  "f32_to_f32",  "f32_to_f64"},  //from F32
+  {"f64_to_i8",  "f64_to_i16",  "f64_to_i32",  "f64_to_i64",  "f64_to_u8",  "f64_to_u16",  "f64_to_u32",  "f64_to_u64",  "f64_to_f32",  "f64_to_f64"}   //from F64
 };
 
 static void cast(Type *from, Type *to) {
@@ -610,6 +632,10 @@ static void cast(Type *from, Type *to) {
 
   int t1 = getTypeId(from);
   int t2 = getTypeId(to);
+
+  // debug
+  println("  # cast: %s", print_cast_table[t1][t2]);
+
   if (cast_table[t1][t2]) {
     println("  %s", cast_table[t1][t2]);
   }
