@@ -60,6 +60,15 @@ static Type *get_common_type(Type *ty1, Type *ty2) {
     return pointer_to(ty1->base);
   }
 
+  // Use double if either operand is double, otherwise float if either is float.
+  if (ty1->kind == TY_DOUBLE || ty2->kind == TY_DOUBLE) {
+    return cp_type(ty_double);
+  }
+
+  if (ty1->kind == TY_FLOAT || ty2->kind == TY_FLOAT) {
+    return cp_type(ty_float);
+  }
+
   // sizeが4byte未満の整数型は、intに昇格する(integer promotion)
   if (ty1->size < 4) {
     ty1 = cp_type(ty_int);

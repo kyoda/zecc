@@ -1,40 +1,40 @@
 # 🧠 Compiler Implementation Reference
 
 自作Cコンパイラ開発中によく忘れる・混乱しやすい内容をまとめたメモ。
-対象は主に x86-64 / System V ABI / Intel記法 / AT&T記法 / C言語。
+対象は主に x86-64 / System V ABI / Intel記法 / AT\&T記法 / C言語。
 
----
+***
 
 # 1. Compiler Concepts
 
 ## 用語
 
-| 分類    | 用語                         | 意味 / 役割              | 例                                     | 備考               |
-| ----- | -------------------------- | -------------------- | ------------------------------------- | ---------------- |
-| 字句解析  | Tokenizer                  | ソースコード文字列をトークン列へ分割する | `"a + 3"` → `IDENT(a), '+', NUM(3)`   | lexer            |
-| 構文解析  | Syntax Tree                | プログラム構造を木で表現したもの     | `(1 + 2) * 3` の木                      | CST / AST を含む広義  |
-| 構文解析  | CST (Concrete Syntax Tree) | 文法をそのまま反映した構文木       | 括弧や文法ノードも保持                           | パース結果に近い         |
-| 構文解析  | AST (Abstract Syntax Tree) | 不要な文法情報を省いた構文木       | `(+ 1 (* 2 3))`                       | コンパイラ内部で利用       |
-| 文法    | Production Rule            | 記号を別の記号列へ展開するルール     | `Expr → Expr "+" Term`                | 文法の基本単位          |
-| 文法    | Chomsky Hierarchy          | 文法を計算能力で分類する体系       | Type 0 ～ Type 3                       | 下に行くほど制約が強い      |
-| 文法    | CFG (Context-Free Grammar) | 左辺が単一の非終端記号である文法     | `Expr → Expr "+" Term`                | 多くの言語で利用         |
-| 文法    | BNF (Backus-Naur Form)     | 文法を記述する記法            | `<expr> ::= <expr> "+" <term>`        | CFGの表現に利用        |
-| 文法    | EBNF (Extended BNF)        | BNFを拡張した記法           | `<expr> = <term> { "+" <term> }`      | `{}` や `[]` が使える |
-| 文法    | Terminal Symbol            | それ以上展開されない記号         | `"+"`, `"if"`, `"("`                  | tokenizerの出力に対応  |
-| 文法    | Nonterminal Symbol         | 他の記号列へ展開される記号        | `<expr>`, `<stmt>`                    | 文法上のカテゴリ         |
-| 構文解析  | Recursive Descent Parsing  | 関数の再帰呼び出しで文法を処理する手法  | `parse_expr()`                        | LL系パーサ           |
-| 式     | Operator                   | 計算や操作を表す記号           | `+`, `-`, `*`, `/`, `&`               | 優先順位あり           |
-| 式     | Operand                    | 演算の対象となる値や式          | `a`, `3`, `x + 1`                     | ASTの子ノード         |
-| 式     | Dereference Operator       | ポインタの指す先の値を取得        | `*p`                                  | 単項演算子            |
-| 式     | Address-of Operator        | 変数などのアドレスを取得         | `&x`                                  | lvalue → pointer |
-| データ構造 | Self-referential Structure | 自分自身の型へのポインタを持つ構造体   | `struct Node { struct Node *next; };` | リスト・木で使用         |
-| アセンブリ | Instruction | CPUが実行する命令 | `add eax, 10` | 命令全体を指す |
-| アセンブリ | Mnemonic | CPU命令を人間が読めるように表した名前 | `mov`, `add`, `sub`, `movsx` | 命令の記憶用表記 |
-| アセンブリ | Opcode | 機械語で操作の種類を指定する部分 | `83`（`add eax, 10` の場合） | 機械語の命令エンコーディングの一部 |
-| アセンブリ | Directive | アセンブラへの指示 | `.data`, `.text`, `.global` | CPU命令ではない |
-| アセンブリ | Immediate | 命令のオペランドとして直接指定する定数値 | `mov eax, 10` の `10` | レジスタやメモリから読み出す値ではない |
+| 分類    | 用語                         | 意味 / 役割              | 例                                     | 備考                  |
+| ----- | -------------------------- | -------------------- | ------------------------------------- | ------------------- |
+| 字句解析  | Tokenizer                  | ソースコード文字列をトークン列へ分割する | `"a + 3"` → `IDENT(a), '+', NUM(3)`   | lexer               |
+| 構文解析  | Syntax Tree                | プログラム構造を木で表現したもの     | `(1 + 2) * 3` の木                      | CST / AST を含む広義     |
+| 構文解析  | CST (Concrete Syntax Tree) | 文法をそのまま反映した構文木       | 括弧や文法ノードも保持                           | パース結果に近い            |
+| 構文解析  | AST (Abstract Syntax Tree) | 不要な文法情報を省いた構文木       | `(+ 1 (* 2 3))`                       | コンパイラ内部で利用          |
+| 文法    | Production Rule            | 記号を別の記号列へ展開するルール     | `Expr → Expr "+" Term`                | 文法の基本単位             |
+| 文法    | Chomsky Hierarchy          | 文法を計算能力で分類する体系       | Type 0 ～ Type 3                       | 下に行くほど制約が強い         |
+| 文法    | CFG (Context-Free Grammar) | 左辺が単一の非終端記号である文法     | `Expr → Expr "+" Term`                | 多くの言語で利用            |
+| 文法    | BNF (Backus-Naur Form)     | 文法を記述する記法            | `<expr> ::= <expr> "+" <term>`        | CFGの表現に利用           |
+| 文法    | EBNF (Extended BNF)        | BNFを拡張した記法           | `<expr> = <term> { "+" <term> }`      | `{}` や `[]` が使える    |
+| 文法    | Terminal Symbol            | それ以上展開されない記号         | `"+"`, `"if"`, `"("`                  | tokenizerの出力に対応     |
+| 文法    | Nonterminal Symbol         | 他の記号列へ展開される記号        | `<expr>`, `<stmt>`                    | 文法上のカテゴリ            |
+| 構文解析  | Recursive Descent Parsing  | 関数の再帰呼び出しで文法を処理する手法  | `parse_expr()`                        | LL系パーサ              |
+| 式     | Operator                   | 計算や操作を表す記号           | `+`, `-`, `*`, `/`, `&`               | 優先順位あり              |
+| 式     | Operand                    | 演算の対象となる値や式          | `a`, `3`, `x + 1`                     | ASTの子ノード            |
+| 式     | Dereference Operator       | ポインタの指す先の値を取得        | `*p`                                  | 単項演算子               |
+| 式     | Address-of Operator        | 変数などのアドレスを取得         | `&x`                                  | lvalue → pointer    |
+| データ構造 | Self-referential Structure | 自分自身の型へのポインタを持つ構造体   | `struct Node { struct Node *next; };` | リスト・木で使用            |
+| アセンブリ | Instruction                | CPUが実行する命令           | `add eax, 10`                         | 命令全体を指す             |
+| アセンブリ | Mnemonic                   | CPU命令を人間が読めるように表した名前 | `mov`, `add`, `sub`, `movsx`          | 命令の記憶用表記            |
+| アセンブリ | Opcode                     | 機械語で操作の種類を指定する部分     | `83`（`add eax, 10` の場合）               | 機械語の命令エンコーディングの一部   |
+| アセンブリ | Directive                  | アセンブラへの指示            | `.data`, `.text`, `.global`           | CPU命令ではない           |
+| アセンブリ | Immediate                  | 命令のオペランドとして直接指定する定数値 | `mov eax, 10` の `10`                  | レジスタやメモリから読み出す値ではない |
 
----
+***
 
 # 2. x86-64 Architecture / ABI
 
@@ -66,7 +66,7 @@ GPR
       RAX, RBX, RCX, RDX, ...
 ```
 
----
+***
 
 ## FLAGS
 
@@ -82,7 +82,7 @@ signed比較   → 主に SF / OF / ZF
 unsigned比較 → 主に CF / ZF
 ```
 
----
+***
 
 ## ABI
 
@@ -110,7 +110,7 @@ xmm0, xmm1, xmm2, ...
 
 を使用する。
 
----
+***
 
 ## Stack
 
@@ -142,13 +142,13 @@ push rax
 rsp = 0x7fffffffdff8
 ```
 
----
+***
 
 # 3. x86-64 Assembly Syntax
 
-## 3.1 Intel記法 vs AT&T記法
+## 3.1 Intel記法 vs AT\&T記法
 
-| 項目         | Intel記法                    | AT&T記法                   |
+| 項目         | Intel記法                    | AT\&T記法                  |
 | ---------- | -------------------------- | ------------------------ |
 | オペランド順     | `destination, source`      | `source, destination`    |
 | レジスタ       | `rax`                      | `%rax`                   |
@@ -172,7 +172,7 @@ mov rax, rdi
 rax = rdi
 ```
 
-AT&T:
+AT\&T:
 
 ```asm
 mov %rdi, %rax
@@ -185,7 +185,7 @@ Intel : destination, source
 AT&T  : source, destination
 ```
 
----
+***
 
 ## Registers
 
@@ -198,7 +198,7 @@ al
 xmm0
 ```
 
-AT&T:
+AT\&T:
 
 ```asm
 %rax
@@ -207,7 +207,7 @@ AT&T:
 %xmm0
 ```
 
----
+***
 
 ## Immediate Values
 
@@ -217,7 +217,7 @@ Intel:
 mov eax, 10
 ```
 
-AT&T:
+AT\&T:
 
 ```asm
 mov $10, %eax
@@ -225,7 +225,7 @@ mov $10, %eax
 
 AT&Tでは即値に `$` を付ける。
 
----
+***
 
 ## Memory Access
 
@@ -235,7 +235,7 @@ Intel:
 mov eax, DWORD PTR [rax]
 ```
 
-AT&T:
+AT\&T:
 
 ```asm
 movl (%rax), %eax
@@ -249,13 +249,13 @@ Intel:
 mov eax, DWORD PTR [rax + 8]
 ```
 
-AT&T:
+AT\&T:
 
 ```asm
 movl 8(%rax), %eax
 ```
 
----
+***
 
 ## Addressing Mode
 
@@ -271,7 +271,7 @@ Intel:
 [rax + rcx * 4 + 8]
 ```
 
-AT&T:
+AT\&T:
 
 ```text
 displacement(base, index, scale)
@@ -283,9 +283,9 @@ displacement(base, index, scale)
 8(%rax,%rcx,4)
 ```
 
----
+***
 
-## AT&T Operand Size Suffix
+## AT\&T Operand Size Suffix
 
 | 接尾辞 | 意味           |
 | --- | ------------ |
@@ -296,14 +296,14 @@ displacement(base, index, scale)
 
 例:
 
-| 意味         | Intel                      | AT&T                |
+| 意味         | Intel                      | AT\&T               |
 | ---------- | -------------------------- | ------------------- |
 | 8bit load  | `mov al, BYTE PTR [rax]`   | `movb (%rax), %al`  |
 | 16bit load | `mov ax, WORD PTR [rax]`   | `movw (%rax), %ax`  |
 | 32bit load | `mov eax, DWORD PTR [rax]` | `movl (%rax), %eax` |
 | 64bit load | `mov rax, QWORD PTR [rdi]` | `movq (%rdi), %rax` |
 
----
+***
 
 # 4. x86-64 Instructions
 
@@ -317,7 +317,7 @@ displacement(base, index, scale)
 | `movzx`  | ゼロ拡張してコピー         | `movzx eax, al`    | unsigned       |
 | `lea`    | 有効アドレスを計算         | `lea rax, [rbp-8]` | メモリ値を読み込まない    |
 
----
+***
 
 ## 4.2 Arithmetic
 
@@ -328,7 +328,7 @@ displacement(base, index, scale)
 | `imul` | 整数乗算       | `imul rax, rdi` |
 | `idiv` | signed整数除算 | `idiv rdi`      |
 
----
+***
 
 ## 4.3 Bit Operations
 
@@ -341,7 +341,7 @@ displacement(base, index, scale)
 | `shr` | 論理右シフト  | `shr rax, 1`   | 左を0で埋める、unsigned向け |
 | `sar` | 算術右シフト  | `sar rax, 1`   | 符号bitを維持、signed向け  |
 
----
+***
 
 ## 4.4 Compare / Test
 
@@ -359,7 +359,7 @@ rax - rdi
 
 を計算するが、結果は保存せずFLAGSだけ更新する。
 
-AT&T:
+AT\&T:
 
 ```asm
 cmp %rdi, %rax
@@ -379,7 +379,7 @@ rax & rax
 
 を計算するが、結果は保存せずFLAGSだけ更新する。
 
-AT&T:
+AT\&T:
 
 ```asm
 test %rax, %rax
@@ -418,7 +418,7 @@ u64値が2^63以上
 
 かどうかを見るために利用する。
 
----
+***
 
 ## 4.5 Conditional Jump
 
@@ -438,7 +438,7 @@ u64値が2^63以上
 | `jae`         | unsigned `>=`        | unsigned比較           |
 | `jmp`         | 無条件ジャンプ              | 常にジャンプ               |
 
----
+***
 
 ## 4.6 Memory Operand Size
 
@@ -459,13 +459,13 @@ mov eax, DWORD PTR [rax]
 movzx eax, BYTE PTR [rax]
 ```
 
----
+***
 
 ## 4.7 movsx / movzx
 
 ### Sign Extension
 
-| 変換        | Intel             | AT&T                |
+| 変換        | Intel             | AT\&T               |
 | --------- | ----------------- | ------------------- |
 | i8 → i16  | `movsx ax, al`    | `movsbw %al, %ax`   |
 | i8 → i32  | `movsx eax, al`   | `movsbl %al, %eax`  |
@@ -474,7 +474,7 @@ movzx eax, BYTE PTR [rax]
 | i16 → i64 | `movsx rax, ax`   | `movswq %ax, %rax`  |
 | i32 → i64 | `movsxd rax, eax` | `movslq %eax, %rax` |
 
-AT&Tでは、
+AT\&Tでは、
 
 ```text
 mov s b l
@@ -488,7 +488,7 @@ mov s b l
 
 ### Zero Extension
 
-| 変換        | Intel           | AT&T                      |
+| 変換        | Intel           | AT\&T                     |
 | --------- | --------------- | ------------------------- |
 | u8 → u16  | `movzx ax, al`  | `movzbw %al, %ax`         |
 | u8 → u32  | `movzx eax, al` | `movzbl %al, %eax`        |
@@ -497,7 +497,7 @@ mov s b l
 | u16 → u64 | `movzx rax, ax` | `movzwq %ax, %rax`        |
 | u32 → u64 | `mov eax, eax`  | 32bitレジスタ書込みで上位32bitが0になる |
 
----
+***
 
 # 5. Type Conversion / Cast
 
@@ -511,7 +511,7 @@ mov s b l
 | i16 | i64 | `movsx rax, ax`   |
 | i32 | i64 | `movsxd rax, eax` |
 
----
+***
 
 ## 5.2 Zero Extension
 
@@ -537,7 +537,7 @@ RAX[63:32] = 0
 
 となる。
 
----
+***
 
 ## 5.3 Truncation
 
@@ -549,7 +549,7 @@ RAX[63:32] = 0
 | i32/u32 | i16/u16 | 不要 |
 | i64/u64 | i32/u32 | 不要 |
 
----
+***
 
 ## 5.4 Same-size Cast
 
@@ -564,7 +564,7 @@ signed / unsigned はCPU上では型情報を持たず、同じbit列。
 
 CPUが保持しているのはbit列であり、signed / unsigned の解釈は使用する命令側で決まる。
 
----
+***
 
 # 6. Floating Point
 
@@ -578,7 +578,7 @@ CPUが保持しているのはbit列であり、signed / unsigned の解釈は�
 
 Linux x86-64では `long double` は80bit値を16byte領域に格納する。
 
----
+***
 
 ## 6.2 IEEE754 Layout
 
@@ -595,11 +595,14 @@ value = (-1)^Sign × 1.Fraction × 2^(Exponent - Bias)
 ```
 
 * Sign: `0` = positive, `1` = negative
+
 * Bias: exponent格納時のオフセット
+
 * Fraction: 仮数部
+
 * 正規化数では先頭の `1` は暗黙的
 
----
+***
 
 ## 6.3 Floating-Point Registers
 
@@ -633,7 +636,7 @@ float x = 3.0f;
 xmm0 = 3.0f
 ```
 
----
+***
 
 ## 6.4 Floating-Point Instructions
 
@@ -660,11 +663,11 @@ Packed:
 複数値をSIMD演算
 ```
 
----
+***
 
-## 6.5 Intel / AT&T Floating-Point Instructions
+## 6.5 Intel / AT\&T Floating-Point Instructions
 
-| 変換・操作        | Intel                 | AT&T                     |
+| 変換・操作        | Intel                 | AT\&T                    |
 | ------------ | --------------------- | ------------------------ |
 | float load   | `movss xmm0, [rax]`   | `movss (%rax), %xmm0`    |
 | float store  | `movss [rdi], xmm0`   | `movss %xmm0, (%rdi)`    |
@@ -681,7 +684,7 @@ Packed:
 | f32 → f64    | `cvtss2sd xmm0, xmm0` | `cvtss2sd %xmm0, %xmm0`  |
 | f64 → f32    | `cvtsd2ss xmm0, xmm0` | `cvtsd2ss %xmm0, %xmm0`  |
 
----
+***
 
 ## 6.6 Floating-Point Literals
 
@@ -691,7 +694,7 @@ Packed:
 | `1.0`           | `double`      |
 | `1.0l` / `1.0L` | `long double` |
 
----
+***
 
 ## 6.7 Floating-Point Cast
 
@@ -706,7 +709,7 @@ Packed:
 
 `si` = Signed Integer
 
----
+***
 
 ### Floating Point → Signed Integer
 
@@ -726,7 +729,7 @@ Cの浮動小数点 → 整数castはゼロ方向へ切り捨てる。
 -3.9 → -3
 ```
 
----
+***
 
 ### float ↔ double
 
@@ -735,7 +738,7 @@ Cの浮動小数点 → 整数castはゼロ方向へ切り捨てる。
 | f32 → f64  | `cvtss2sd xmm0, xmm0` |
 | f64 → f32  | `cvtsd2ss xmm0, xmm0` |
 
----
+***
 
 ## 6.8 Cast Mnemonic
 
@@ -765,7 +768,7 @@ to Scalar Single
 signed integer → float
 ```
 
----
+***
 
 ## 6.9 unsigned 32bit → Floating Point
 
@@ -803,7 +806,7 @@ cvtsi2sd xmm0, rax
 // Use a signed 64-bit conversion because the entire u32 range fits in i64.
 ```
 
----
+***
 
 ## 6.10 Floating Point → unsigned 32bit
 
@@ -831,7 +834,7 @@ signed i64
 下位32bitをu32として使用
 ```
 
----
+***
 
 ## 6.11 unsigned 64bit → double
 
@@ -931,7 +934,7 @@ cvtsi2sdでは直接処理できない
 
 ことを判定している。
 
----
+***
 
 ## 6.12 Floating-Point Precision
 
@@ -959,7 +962,7 @@ cvtsi2sdでは直接処理できない
 
 ため、丸めが発生する。
 
----
+***
 
 # 7. C Grammar
 
@@ -973,7 +976,7 @@ cvtsi2sdでは直接処理できない
 | `str`      | 文字列リテラル | `"abc"`                 |
 | `ε`        | 空       | 要素なし                    |
 
----
+***
 
 ## Initializer
 
@@ -998,7 +1001,7 @@ initializer ::= string-initializer
               | assign
 ```
 
----
+***
 
 ## Program / Declaration
 
@@ -1051,7 +1054,7 @@ declaration ::= (declarator ("=" expr)?
                  ("," declarator ("=" expr)?)*)? ";"
 ```
 
----
+***
 
 ## Declarator
 
@@ -1084,7 +1087,7 @@ func-params ::= "void"
                 ("," "...")?)?
 ```
 
----
+***
 
 ## Statement
 
@@ -1114,7 +1117,7 @@ expr-stmt ::= ";"
             | expr ";"
 ```
 
----
+***
 
 ## Expression
 
@@ -1156,7 +1159,7 @@ add ::= mul (("+" | "-") mul)*
 mul ::= cast (("*" | "/" | "%") cast)*
 ```
 
----
+***
 
 ## Cast / Unary
 
@@ -1179,7 +1182,7 @@ unary ::= "sizeof" "(" typename ")"
         | postfix
 ```
 
----
+***
 
 ## Postfix / Primary
 
@@ -1200,7 +1203,7 @@ primary ::= "(" "{" stmt+ "}" ")"
           | num
 ```
 
----
+***
 
 # 8. Translation Phases Memo
 

@@ -29,8 +29,20 @@ static void push(void) {
   depth++;
 }
 
+static void pushf(void) {
+  println("  sub rsp, 8");
+  println("  movsd [rsp], xmm0");
+  depth++;
+}
+
 static void pop(char *arg) {
   println("  pop %s", arg);
+  depth--;
+}
+
+static void popf(char *arg) {
+  println("  movsd %s, [rsp]", arg);
+  println("  add rsp, 8");
   depth--;
 }
 
@@ -690,7 +702,7 @@ static void gen_expr(Node *n) {
     case TY_FLOAT:
       u.f32 = n->fval;
       println("  mov eax, %u", u.u32);
-      println("  movq xmm0, rax");
+      println("  movd xmm0, eax");
       break;
     case TY_DOUBLE:
       u.f64 = n->fval;
@@ -705,10 +717,23 @@ static void gen_expr(Node *n) {
     return;
   case ND_NEG:
     gen_expr(n->lhs);
-    if (n->ty->size == 8) {
-      println("  neg rax");
+
+    if (is_flonum(n->lhs->ty)) {
+      if (n->lhs->ty->kind == TY_FLOAT) {
+        println("  mov eax, 0x80000000");
+        println("  movd xmm1, eax");
+        println("  xorps xmm0, xmm1");
+      } else {
+        println("  mov rax, 0x8000000000000000");
+        println("  movq xmm1, rax");
+        println("  xorpd xmm0, xmm1");
+      }
     } else {
-      println("  neg eax");
+      if (n->ty->size == 8) {
+        println("  neg rax");
+      } else {
+        println("  neg eax");
+      }
     }
 
     return;
@@ -1042,6 +1067,12 @@ static void gen_expr(Node *n) {
   default:
     break;
   }
+
+  //Binary operators
+
+  //if (is_flonum(n->ty)) {
+  //  return;
+  //}
 
   gen_expr(n->lhs);
   push();

@@ -74,7 +74,7 @@ int main() {
   ASSERT(35, (int)(float)35);
   ASSERT(-1, (int)(float)-1);
   ASSERT(3, (int)(float)3.9);
-  //ASSERT(-3, (int)(float)-3.9);
+  ASSERT(-3, (int)(float)-3.9);
   ASSERT(127, (signed char)(float)127);
   ASSERT(-128, (signed char)(float)-128);
   ASSERT(32767, (short)(float)32767);
@@ -95,7 +95,7 @@ int main() {
   ASSERT(35, (long)(float)35);
   ASSERT(-1, (long)(float)-1);
   ASSERT(3, (long)(float)3.9);
-  //ASSERT(-3, (long)(float)-3.9);
+  ASSERT(-3, (long)(float)-3.9);
   //ASSERT(1, ({ (long)(float)2147483648.0 == 2147483648LL; }));
   //ASSERT(1, ({ (long)(float)-9223372036854775808.0 == (-9223372036854775807LL-1); }));
 
@@ -111,11 +111,11 @@ int main() {
   ASSERT(35, (int)(double)35);
   ASSERT(-1, (int)(double)-1);
   ASSERT(3, (int)(double)3.9);
-  //ASSERT(-3, (int)(double)-3.9);
+  ASSERT(-3, (int)(double)-3.9);
   ASSERT(127, (signed char)(double)127);
-  //ASSERT(-128, (signed char)(double)-128);
+  ASSERT(-128, (signed char)(double)-128);
   ASSERT(32767, (short)(double)32767);
-  //ASSERT(-32768, (short)(double)-32768);
+  ASSERT(-32768, (short)(double)-32768);
   //ASSERT(1, ({ (int)(double)2147483647.0 == 2147483647; }));
   //ASSERT(1, ({ (int)(double)-2147483648.0 == -2147483648LL; }));
 
@@ -133,7 +133,7 @@ int main() {
   ASSERT(35, (long)(double)35);
   ASSERT(-1, (long)(double)-1);
   ASSERT(3, (long)(double)3.9);
-  //ASSERT(-3, (long)(double)-3.9);
+  ASSERT(-3, (long)(double)-3.9);
   //ASSERT(1, ({ (long)(double)2147483648.0 == 2147483648LL; }));
   //ASSERT(1, ({ (long)(double)-9223372036854775808.0 == (-9223372036854775807LL-1); }));
 
